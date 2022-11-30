@@ -315,6 +315,24 @@ void MessageClient::impl::parse_message (QByteArray const& msg)
                   }
               }
               break;
+            
+            case NetworkMessage::SetupTx:        //avt 11/28/20
+              {
+                int newTxMsgIdx {0};
+                QByteArray msg;
+                bool skipGrid;
+                bool useRR73;
+                QByteArray check;
+                quint32 offset;             //avt 11/12/21
+                Frequency f;
+                in >> newTxMsgIdx >> msg >> skipGrid >> useRR73 >> check >> offset >> f;
+                TRACE_UDP ("Setup Tx newTxMsgIdx:" << newTxMsgIdx << "msg:" << msg << "skipGrid:" << skipGrid << "useRR73:" << useRR73 << "check:" << check << "offset" << offset << "frequency" << f); //avt 11/14/21
+                if (check_status (in) != Fail)
+                  {
+                    Q_EMIT self_->setup_tx (newTxMsgIdx, QString::fromUtf8(msg), skipGrid, useRR73, QString::fromUtf8(check), offset, f);
+                  }
+              }
+              break;
 
             case NetworkMessage::FreeText:
               {
@@ -571,7 +589,12 @@ void MessageClient::status_update (Frequency f, QString const& mode, QString con
                                    , bool fast_mode, quint8 special_op_mode
                                    , quint32 frequency_tolerance, quint32 tr_period
                                    , QString const& configuration_name
-                                   , QString const& tx_message)
+                                   , QString const& tx_message
+                                   , quint32 qsoProgress
+                                   , bool txFirst
+                                   , bool cQonly
+                                   , QString const& genMsg
+                                   , bool txHaltClk)
 {
   if (m_->server_port_ && !m_->server_.isNull ())
     {
@@ -581,8 +604,8 @@ void MessageClient::status_update (Frequency f, QString const& mode, QString con
           << tx_enabled << transmitting << decoding << rx_df << tx_df << de_call.toUtf8 ()
           << de_grid.toUtf8 () << dx_grid.toUtf8 () << watchdog_timeout << sub_mode.toUtf8 ()
           << fast_mode << special_op_mode << frequency_tolerance << tr_period << configuration_name.toUtf8 ()
-          << tx_message.toUtf8 ();
-      TRACE_UDP ("frequency:" << f << "mode:" << mode << "DX:" << dx_call << "report:" << report << "Tx mode:" << tx_mode << "tx_enabled:" << tx_enabled << "Tx:" << transmitting << "decoding:" << decoding << "Rx df:" << rx_df << "Tx df:" << tx_df << "DE:" << de_call << "DE grid:" << de_grid << "DX grid:" << dx_grid << "w/d t/o:" << watchdog_timeout << "sub_mode:" << sub_mode << "fast mode:" << fast_mode << "spec op mode:" << special_op_mode << "frequency tolerance:" << frequency_tolerance << "T/R period:" << tr_period << "configuration name:" << configuration_name << "Tx message:" << tx_message);
+          << tx_message.toUtf8 () << qsoProgress << txFirst << cQonly  << genMsg.toUtf8 () << txHaltClk;
+      TRACE_UDP ("frequency:" << f << "mode:" << mode << "DX:" << dx_call << "report:" << report << "Tx mode:" << tx_mode << "tx_enabled:" << tx_enabled << "Tx:" << transmitting << "decoding:" << decoding << "Rx df:" << rx_df << "Tx df:" << tx_df << "DE:" << de_call << "DE grid:" << de_grid << "DX grid:" << dx_grid << "w/d t/o:" << watchdog_timeout << "sub_mode:" << sub_mode << "fast mode:" << fast_mode << "spec op mode:" << special_op_mode << "frequency tolerance:" << frequency_tolerance << "T/R period:" << tr_period << "configuration name:" << configuration_name << "Tx message:" << tx_message  << "qsoProgress:" << qsoProgress << "txFirst:" << txFirst << "cQonly:" << cQonly << "genMsg:" << genMsg << "txHaltClk:" << txHaltClk);
       m_->send_message (out, message);
     }
 }
@@ -598,6 +621,21 @@ void MessageClient::decode (bool is_new, QTime time, qint32 snr, float delta_tim
       out << is_new << time << snr << delta_time << delta_frequency << mode.toUtf8 ()
           << message_text.toUtf8 () << low_confidence << off_air;
       TRACE_UDP ("new" << is_new << "time:" << time << "snr:" << snr << "dt:" << delta_time << "df:" << delta_frequency << "mode:" << mode << "text:" << message_text << "low conf:" << low_confidence << "off air:" << off_air);
+      m_->send_message (out, message);
+    }
+}
+
+void MessageClient::enqueue_decode (bool autoGen, QTime time, qint32 snr, float delta_time, quint32 delta_frequency
+                            , QString const& mode, QString const& message_text, bool isDx
+                            , bool modifier)
+{
+   if (m_->server_port_ && !m_->server_.isNull ())
+    {
+      QByteArray message;
+      NetworkMessage::Builder out {&message, NetworkMessage::EnqueueDecode, m_->id_, m_->schema_};
+      out << autoGen << time << snr << delta_time << delta_frequency << mode.toUtf8 ()
+          << message_text.toUtf8 () << isDx << modifier;
+      TRACE_UDP ("autoGen" << autoGen << "time:" << time << "snr:" << snr << "dt:" << delta_time << "df:" << delta_frequency << "mode:" << mode << "text:" << message_text << "isDx:" << isDx << "modifier:" << modifier);
       m_->send_message (out, message);
     }
 }

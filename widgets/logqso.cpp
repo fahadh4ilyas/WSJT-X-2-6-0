@@ -165,7 +165,7 @@ void LogQSO::storeSettings () const
 void LogQSO::initLogQSO(QString const& hisCall, QString const& hisGrid, QString mode,
                         QString const& rptSent, QString const& rptRcvd,
                         QDateTime const& dateTimeOn, QDateTime const& dateTimeOff,
-                        Radio::Frequency dialFreq, bool noSuffix, QString xSent, QString xRcvd)
+                        Radio::Frequency dialFreq, bool noSuffix, QString xSent, QString xRcvd, bool externalCtrl)
 {
   if(!isHidden()) return;
 /*
@@ -239,8 +239,9 @@ void LogQSO::initLogQSO(QString const& hisCall, QString const& hisGrid, QString 
   using SpOp = Configuration::SpecialOperatingActivity;
   auto special_op = m_config->special_op_id ();
   if (SpOp::FOX == special_op
+      || externalCtrl 
       || (m_config->autoLog ()
-          && SpOp::NONE < special_op && special_op < SpOp::FOX))
+          /*&& SpOp::NONE < special_op && special_op < SpOp::FOX*/))
     {
       // allow auto logging in Fox mode and contests
       accept();

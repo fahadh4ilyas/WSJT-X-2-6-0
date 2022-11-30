@@ -64,10 +64,13 @@ public:
                              , QString const& dx_grid, bool watchdog_timeout, QString const& sub_mode
                              , bool fast_mode, quint8 special_op_mode, quint32 frequency_tolerance
                              , quint32 tr_period, QString const& configuration_name
-                             , QString const& tx_message);
+                             , QString const& tx_message, quint32 qsoProgress, bool txFirst, bool cQOnly, QString const& genMsg, bool txHaltClk);
   Q_SLOT void decode (bool is_new, QTime time, qint32 snr, float delta_time, quint32 delta_frequency
                       , QString const& mode, QString const& message, bool low_confidence
                       , bool off_air);
+  Q_SLOT void enqueue_decode (bool autoGen, QTime time, qint32 snr, float delta_time, quint32 delta_frequency
+                      , QString const& mode, QString const& message, bool isDx
+                      , bool modifier);
   Q_SLOT void WSPR_decode (bool is_new, QTime time, qint32 snr, float delta_time, Frequency
                            , qint32 drift, QString const& callsign, QString const& grid, qint32 power
                            , bool off_air);
@@ -131,6 +134,8 @@ public:
   // server.  (It doesn't have to be new, could be a periodic location
   // update)
   Q_SIGNAL void location (QString const&);
+
+  Q_SIGNAL void setup_tx (int newTxMsgIdx, QString const& msg, bool skipGrid, bool useRR73, QString const& check, quint32 offset, Frequency f);
 
 private:
   class impl;

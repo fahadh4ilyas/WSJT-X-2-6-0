@@ -351,6 +351,7 @@ private slots:
   void remote_configure (QString const& mode, quint32 frequency_tolerance, QString const& submode
                          , bool fast_mode, quint32 tr_period, quint32 rx_df, QString const& dx_call
                          , QString const& dx_grid, bool generate_messages);
+  void showExternalCtrlDisconnect();
   void callSandP2(int nline);
 
 private:
@@ -581,6 +582,12 @@ private:
   bool    m_bBestSPArmed=false;
   bool    m_bOK_to_chk=false;
   bool    m_bSentReport=false;
+  bool    m_externalCtrl=false;
+  QString m_checkCmd;
+  bool    m_dblClk;
+  QString m_dxCall;
+  bool    m_bOffset;
+  bool    m_txHaltClk;
 
   SpecOp  m_specOp;
 
@@ -647,6 +654,7 @@ private:
   QTimer minuteTimer;
   QTimer splashTimer;
   QTimer p1Timer;
+  QTimer externalCtrlTimer;
 
   QString m_path;
   QString m_baseCall;
@@ -805,7 +813,8 @@ private:
   void replyToCQ (QTime, qint32 snr, float delta_time, quint32 delta_frequency, QString const& mode, QString const& message_text, bool low_confidence, quint8 modifiers);
   void locationChange(QString const& location);
   void replayDecodes ();
-  void postDecode (bool is_new, QString const& message);
+  void postDecode (bool is_new, DecodedText decoded_text);
+  void enqueueDecode (DecodedText decoded_text, bool modifier, bool autoGen, bool isDx);
   void postWSPRDecode (bool is_new, QStringList message_parts);
   void enable_DXCC_entity (bool on);
   void switch_mode (Mode);
@@ -840,7 +849,7 @@ private:
   void decodeDone ();
   bool subProcessFailed (QProcess *, int exit_code, QProcess::ExitStatus);
   void subProcessError (QProcess *, QProcess::ProcessError);
-  void statusUpdate () const;
+  void statusUpdate (); // const;
   void update_watchdog_label ();
   void invalidate_frequencies_filter ();
   void on_the_minute ();
@@ -866,6 +875,9 @@ private:
   Q_SLOT void ARRL_Digi_Display();
   void ARRL_Digi_Update(DecodedText dt);
   void activeWorked(QString call, QString band);
+  bool is_externalCtrlMode();
+  void initExternalCtrl();
+  void externalCtrlDisconnected();
 };
 
 extern int killbyname(const char* progName);

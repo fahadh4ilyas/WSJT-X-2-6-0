@@ -526,6 +526,8 @@ namespace NetworkMessage
       HighlightCallsign,
       SwitchConfiguration,
       Configure,
+      SetupTx,
+      EnqueueDecode,
       maximum_message_type_     // ONLY add new message types
                                 // immediately before here
     };
