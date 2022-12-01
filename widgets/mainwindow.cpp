@@ -2235,7 +2235,6 @@ void MainWindow::fastSink(qint64 frames)
     m_bDecoded=true;
     auto_sequence (decodedtext, ui->sbFtol->value (), std::numeric_limits<unsigned>::max ());
     if (m_mode != "ISCAT") postDecode (true, decodedtext);
-    postDecode (true, decodedtext);
 //    writeAllTxt(message);
     write_all("Rx",message);
     bool stdMsg = decodedtext.report(m_baseCall,
@@ -2534,7 +2533,7 @@ void MainWindow::keyPressEvent (QKeyEvent * e)
   return;
     case Qt::Key_C:
     if(e->modifiers() & Qt::AltModifier) {
-      if(!m_externalCtrl && m_mode=="FT4") {
+      if(!m_externalCtrl) {
         int n=ui->respondComboBox->currentIndex()+1;
         if(n>2) n=0;
         ui->respondComboBox->setCurrentIndex(n);
