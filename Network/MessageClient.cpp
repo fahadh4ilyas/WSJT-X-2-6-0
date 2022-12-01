@@ -256,20 +256,21 @@ void MessageClient::impl::parse_message (QByteArray const& msg)
                 QByteArray message;
                 bool low_confidence {false};
                 quint8 modifiers {0};
+                bool not_script {true};
                 in >> time >> snr >> delta_time >> delta_frequency >> mode >> message
-                   >> low_confidence >> modifiers;
+                   >> low_confidence >> modifiers >> not_script;
                 TRACE_UDP ("Reply: time:" << time << "snr:" << snr << "dt:" << delta_time << "df:" << delta_frequency << "mode:" << mode << "message:" << message << "low confidence:" << low_confidence << "modifiers: 0x"
 #if QT_VERSION >= QT_VERSION_CHECK (5, 15, 0)
                            << Qt::hex
 #else
                            << hex
 #endif
-                           << modifiers);
+                           << modifiers << "not by script: " << not_script);
                 if (check_status (in) != Fail)
                   {
                     Q_EMIT self_->reply (time, snr, delta_time, delta_frequency
                                          , QString::fromUtf8 (mode), QString::fromUtf8 (message)
-                                         , low_confidence, modifiers);
+                                         , low_confidence, modifiers, not_script);
                   }
               }
               break;
@@ -594,7 +595,8 @@ void MessageClient::status_update (Frequency f, QString const& mode, QString con
                                    , bool txFirst
                                    , bool cQonly
                                    , QString const& genMsg
-                                   , bool txHaltClk)
+                                   , bool txHaltClk
+                                   , bool notScript)
 {
   if (m_->server_port_ && !m_->server_.isNull ())
     {
@@ -604,8 +606,8 @@ void MessageClient::status_update (Frequency f, QString const& mode, QString con
           << tx_enabled << transmitting << decoding << rx_df << tx_df << de_call.toUtf8 ()
           << de_grid.toUtf8 () << dx_grid.toUtf8 () << watchdog_timeout << sub_mode.toUtf8 ()
           << fast_mode << special_op_mode << frequency_tolerance << tr_period << configuration_name.toUtf8 ()
-          << tx_message.toUtf8 () << qsoProgress << txFirst << cQonly  << genMsg.toUtf8 () << txHaltClk;
-      TRACE_UDP ("frequency:" << f << "mode:" << mode << "DX:" << dx_call << "report:" << report << "Tx mode:" << tx_mode << "tx_enabled:" << tx_enabled << "Tx:" << transmitting << "decoding:" << decoding << "Rx df:" << rx_df << "Tx df:" << tx_df << "DE:" << de_call << "DE grid:" << de_grid << "DX grid:" << dx_grid << "w/d t/o:" << watchdog_timeout << "sub_mode:" << sub_mode << "fast mode:" << fast_mode << "spec op mode:" << special_op_mode << "frequency tolerance:" << frequency_tolerance << "T/R period:" << tr_period << "configuration name:" << configuration_name << "Tx message:" << tx_message  << "qsoProgress:" << qsoProgress << "txFirst:" << txFirst << "cQonly:" << cQonly << "genMsg:" << genMsg << "txHaltClk:" << txHaltClk);
+          << tx_message.toUtf8 () << qsoProgress << txFirst << cQonly  << genMsg.toUtf8 () << txHaltClk << notScript;
+      TRACE_UDP ("frequency:" << f << "mode:" << mode << "DX:" << dx_call << "report:" << report << "Tx mode:" << tx_mode << "tx_enabled:" << tx_enabled << "Tx:" << transmitting << "decoding:" << decoding << "Rx df:" << rx_df << "Tx df:" << tx_df << "DE:" << de_call << "DE grid:" << de_grid << "DX grid:" << dx_grid << "w/d t/o:" << watchdog_timeout << "sub_mode:" << sub_mode << "fast mode:" << fast_mode << "spec op mode:" << special_op_mode << "frequency tolerance:" << frequency_tolerance << "T/R period:" << tr_period << "configuration name:" << configuration_name << "Tx message:" << tx_message  << "qsoProgress:" << qsoProgress << "txFirst:" << txFirst << "cQonly:" << cQonly << "genMsg:" << genMsg << "txHaltClk:" << txHaltClk << "notScript:" << notScript);
       m_->send_message (out, message);
     }
 }

@@ -588,6 +588,7 @@ private:
   QString m_dxCall;
   bool    m_bOffset;
   bool    m_txHaltClk;
+  bool    m_notScript;
 
   SpecOp  m_specOp;
 
@@ -810,7 +811,7 @@ private:
   void displayDialFrequency ();
   void transmitDisplay (bool);
   void processMessage(DecodedText const& message, Qt::KeyboardModifiers = Qt::NoModifier);
-  void replyToCQ (QTime, qint32 snr, float delta_time, quint32 delta_frequency, QString const& mode, QString const& message_text, bool low_confidence, quint8 modifiers);
+  void replyToCQ (QTime, qint32 snr, float delta_time, quint32 delta_frequency, QString const& mode, QString const& message_text, bool low_confidence, quint8 modifiers, bool not_script);
   void locationChange(QString const& location);
   void replayDecodes ();
   void postDecode (bool is_new, DecodedText decoded_text);

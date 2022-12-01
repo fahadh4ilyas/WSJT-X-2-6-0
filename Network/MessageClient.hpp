@@ -64,7 +64,7 @@ public:
                              , QString const& dx_grid, bool watchdog_timeout, QString const& sub_mode
                              , bool fast_mode, quint8 special_op_mode, quint32 frequency_tolerance
                              , quint32 tr_period, QString const& configuration_name
-                             , QString const& tx_message, quint32 qsoProgress, bool txFirst, bool cQOnly, QString const& genMsg, bool txHaltClk);
+                             , QString const& tx_message, quint32 qsoProgress, bool txFirst, bool cQOnly, QString const& genMsg, bool txHaltClk, bool notScript);
   Q_SLOT void decode (bool is_new, QTime time, qint32 snr, float delta_time, quint32 delta_frequency
                       , QString const& mode, QString const& message, bool low_confidence
                       , bool off_air);
@@ -94,7 +94,7 @@ public:
   // this signal is emitted if the server sends us a reply, the only
   // reply supported is reply to a prior CQ or QRZ message
   Q_SIGNAL void reply (QTime, qint32 snr, float delta_time, quint32 delta_frequency, QString const& mode
-                       , QString const& message_text, bool low_confidence, quint8 modifiers);
+                       , QString const& message_text, bool low_confidence, quint8 modifiers, bool not_script);
 
   // this signal is emitted if the server has requested this client to
   // close down gracefully

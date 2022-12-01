@@ -596,6 +596,7 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
   connect (m_messageClient, &MessageClient::setup_tx, [this] (int newTxMsgIdx, QString const& msg, bool skipGrid, bool useRR73, QString const& check, quint32 offset, Frequency f) {    //avt 11/16/20
       if (!m_externalCtrl) last_tx_label.setText("Controller initiated");
       m_externalCtrl = true;    //configure for UDP listener special cases
+      m_notScript = false;
       initExternalCtrl();       //disable Call 1st and Auto buttons 
       //QApplication::beep();    //for debug
 
@@ -733,6 +734,7 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
       {
         externalCtrlTimer.stop();
         m_externalCtrl = false;    //de-init, WSJT-X back to normal operation
+        m_notScript = true;
         initExternalCtrl();
         last_tx_label.setText("Controller terminated");
         return;
@@ -5780,8 +5782,10 @@ void MainWindow::doubleClickOnCall(Qt::KeyboardModifiers modifiers)
   }
   statusUpdate();             //end msg w/m_dblClk false to defeat same-message check
   m_dblClk = true;            //must only be set if not alt-key related
+  m_notScript = true;
   statusUpdate();             //make sure UDP listener notified of this event 
   m_dblClk = false;     //one-shot event notification
+  m_notScript = !m_externalCtrl;
 
   m_bDoubleClicked = true;
   processMessage (message, modifiers);
@@ -9014,7 +9018,7 @@ void MainWindow::on_cbTx6_toggled(bool)
 // Takes a decoded CQ line and sets it up for reply
 void MainWindow::replyToCQ (QTime time, qint32 snr, float delta_time, quint32 delta_frequency
                             , QString const& mode, QString const& message_text
-                            , bool useReply, quint8 modifiers)
+                            , bool useReply, quint8 modifiers, bool not_script)
 {
   QString format_string {"%1 %2 %3 %4 %5 %6"};
   auto const& time_string = time.toString ("~" == mode || "&" == mode || "+" == mode
@@ -9078,7 +9082,9 @@ void MainWindow::replyToCQ (QTime time, qint32 snr, float delta_time, quint32 de
         QApplication::alert (this);   //UDP listener doesn't want this
       }
       else {
+        m_notScript = not_script;
         statusUpdate();           //UDP listener needs txFirst info
+        m_notScript = false;
       }
     }
   else
@@ -9765,7 +9771,8 @@ void MainWindow::statusUpdate () //const
                                   m_currentMessage.trimmed(), m_QSOProgress, ui->txFirstCheckBox->isChecked(),     //UDP listener needs extra info
                                   m_dblClk,
                                   m_checkCmd,
-                                  m_txHaltClk);
+                                  m_txHaltClk,
+                                  m_notScript);
 }
 
 void MainWindow::childEvent (QChildEvent * e)
@@ -10928,6 +10935,7 @@ void MainWindow::initExternalCtrl()
 void MainWindow::externalCtrlDisconnected()
 {
   m_externalCtrl = false;
+  m_notScript = true;
   initExternalCtrl();
   on_stopTxButton_clicked();
   QTimer::singleShot (500, this, SLOT (showExternalCtrlDisconnect()));
