@@ -194,7 +194,7 @@ subroutine multimode_decoder(ss,id2,params,nfsample)
   if(params%nmode.eq.5) then
      call timer('decft4  ',0)
      call my_ft4%decode(ft4_decoded,id2,params%nQSOProgress,params%nfqso,    &
-          params%nfa,params%nfb,params%ndepth,                               &
+          params%nutc,params%nfa,params%nfb,params%ndepth,                   &
           logical(params%lapcqonly),ncontest,mycall,hiscall)
      call timer('decft4  ',1)
      go to 800
@@ -601,7 +601,17 @@ contains
     decoded0=decoded
 
     annot='  ' 
-    if(nap.ne.0) then
+    ! s52d: ugly way to notify about diversity
+    if ((nap/100).ne.0) then ! nap 100/200/300 for time/space/frame d
+       if ((nap/100).lt.2) then 
+          annot='t '
+       elseif ((nap/100).lt.3) then 
+          annot='s '
+       else ! frame diversity, 300
+          annot='f '
+       endif
+       if (mod(nap,100).ne.0) annot(2:2)='a'
+    elseif(nap.ne.0) then
        write(annot,'(a1,i1)') 'a',nap
        if(qual.lt.0.17) decoded0(37:37)='?'
     endif
@@ -680,10 +690,20 @@ contains
     decoded0=decoded
 
     annot='  ' 
-    if(nap.ne.0) then
-       write(annot,'(a1,i1)') 'a',nap
-       if(qual.lt.0.17) decoded0(37:37)='?'
-    endif
+    ! s52d: ugly way to notify about diversity
+    if ((nap/100).ne.0) then ! nap 100/200/300 for time/space/frame d
+      if ((nap/100).lt.2) then 
+         annot='t '
+      elseif ((nap/100).lt.3) then 
+         annot='s '
+      else ! frame diversity, 300
+         annot='f '
+      endif
+      if (mod(nap,100).ne.0) annot(2:2)='a'
+   elseif(nap.ne.0) then
+      write(annot,'(a1,i1)') 'a',nap
+      if(qual.lt.0.17) decoded0(37:37)='?'
+   endif
 
     write(*,1001) params%nutc,snr,dt,nint(freq),decoded0,annot
 1001 format(i6.6,i4,f5.1,i5,' + ',1x,a37,1x,a2)

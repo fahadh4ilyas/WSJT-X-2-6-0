@@ -10,7 +10,7 @@ subroutine clockit(dname,k)
   logical first,on(50)
   real ut(50),ut0(50),dut(50),tt(2)
   integer ncall(50),nlevel(50),nparent(50)
-  integer onlevel(0:10)
+  integer onlevel(0:12)
   data first/.true./,eps/0.000001/,ntrace/0/
   data level/0/,nmax/0/,space/'        '/
   data limtrace/0/,lu/29/,ntimer/1/

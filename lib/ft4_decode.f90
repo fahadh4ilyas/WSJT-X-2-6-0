@@ -24,9 +24,10 @@ module ft4_decode
 contains
 
    subroutine decode(this,callback,iwave,nQSOProgress,nfqso,    &
-      nfa,nfb,ndepth,lapcqonly,ncontest,mycall,hiscall)
+      nutc,nfa,nfb,ndepth,lapcqonly,ncontest,mycall,hiscall)
       use timer_module, only: timer
       use packjt77
+      use prog_args
       include 'ft4/ft4_params.f90'
       parameter (MAXCAND=200)
       class(ft4_decoder), intent(inout) :: this
@@ -84,9 +85,29 @@ contains
          0,1,0,1,0,1,1,0,1,1,1,1,1,0,0,0,1,0,1/
       save fs,dt,tt,txt,twopi,h,first,apbits,nappasses,naptypes, &
          mycall0,hiscall0,ctwk2
+! s52d diversity data
+      real ddd(NMAX,5) !s52d: save 4 periods + data read from disk
+      save ddd        
+! dttable selected so that any tone get a chance for 60 degrees
+! 50% samples .le. 16 deg, 77% .le. 30 deg, 97% .le. 60 deg, all .le. 90 deg 
+      integer*2 ::  dttable7(7) = (/ 0, 10, 17, 20, 25, 30, 39 /) 
+      integer*2 ::  dttable4(7) = (/ 0, 4, 7, 10, 0, 0, 0 /) 
+      integer*2 ::  dttable3(7) = (/ 0, 4, 8, 0, 0, 0, 0 /) 
+      integer*2  dttablet(7), dttables(7)
+! Hoj, za 2020: 0 10 17 20 25 30 39, prvi 0, 10, 17, 20, 25, 31, 39
+      integer*2 dtoffset
+      integer*2 :: tdlen =3,sdlen =0  
+      logical  :: divsav,divread,ldupe
+! diversity configuration, read file once
+      logical :: tdivok = .true. , fswriteok = .false. ,fdivok = .false., sdivok = .false.
+      character*64 divwdir, divrdir
+      save tdivok, fswriteok, fdivok, sdivok, divwdir, divrdir, dttablet, dttables, tdlen, sdlen
+      character datetime*13  !filename, compatibility with FT8
 
       this%callback => callback
       hhmmss=cdatetime0(8:13)
+      write(datetime,1001) nutc        !### TEMPORARY ### used for diversity filename as well
+1001 format("000000_",i6.6)
       dxcall13=hiscall        ! initialize for use in packjt77
       mycall13=mycall
 
@@ -142,6 +163,46 @@ contains
          mycall0=''
          hiscall0=''
          first=.false.
+! s52d read diversity configuration file, if it exists      
+         dttablet=dttable7  ! default on
+         dttables=dttable7
+         divread=.false.
+         ipnow=0 ! to make compiler happy
+         ipold=2 
+         open(100,file=trim(data_dir)//'/wsdiv.txt',status='old',err=299) 
+         read(100,*, err=299) i
+         if (i.eq.0) tdivok = .false. !default ON
+         if (i.ne.0) then
+            tdlen=i ! poblem with wrong number
+            if (i.eq.3) dttablet=dttable3
+            if (i.eq.4) dttablet=dttable4
+            if (i.eq.7) dttablet=dttable7
+         endif
+         read(100,*, err=299) i ! ft8
+         read(100,*, err=299) i
+         if (i.ne.0) fswriteok = .true. !default OFF
+         read(100,*, err=299) i ! ft8
+         read(100,*, err=299) i
+         if  (i.ne.0) fdivok = .true.
+         read(100,*, err=299) i ! ft8
+         read(100,*, err=299) i !space diversity
+         if (i.ne.0) then 
+            sdivok = .true.
+            sdlen=i
+            if (i.eq.3) dttables=dttable3
+            if (i.eq.4) dttables=dttable4
+            if (i.eq.4) dttables=dttable7
+            fdivok = .true. 
+            tdivok = .true. ! we need some delay before file can be read
+         endif
+         read(100,*, err=299) i ! ft8
+         read(100,*, err=299) i ! spare
+         read(100,*, err=299) i ! spare
+         read(100,'(A)', err=299) divwdir
+         read(100,'(A)', err=299) divrdir
+!        print *,tdivok,fswriteok,fdivok,sdivok, trim(divwdir),',',trim(divrdir),'.'
+         close(100)
+299   continue
       endif
 
       l1=index(mycall,char(0))
@@ -186,6 +247,12 @@ contains
       fa=nfa
       fb=nfb
       dd=iwave
+! s52d: save data for space diversity.
+      divsav=fswriteok
+      if (fswriteok) then
+         open(101,file=trim(divwdir)//datetime//'.dd4',access='stream',status='REPLACE',iostat=ioerr)
+         if (ioerr .gt. 0) divsav=.false. ! directory does not exist. Some more actions needed
+      endif
 
 ! ndepth=3: 3 passes, bp+osd
 ! ndepth=2: 3 passes, bp only
@@ -205,14 +272,116 @@ contains
          doosd=.false.
       endif
 
-      do isp = 1,nsp
+      if (divsav .or. tdivok .or. sdivok) dosubtract=.true. ! if diversity enabled...
+      do isp = 1,28
          if(isp.eq.2) then
-            if(ndecodes.eq.0) exit
+            if(ndecodes.eq.0) cycle !s52d, give chance to diversity
             nd1=ndecodes
          elseif(isp.eq.3) then
             nd2=ndecodes-nd1
-            if(nd2.eq.0) exit
+            if(nd2.eq.0) cycle !s52d, give chance to diversity
          endif
+! s52d: diversity code
+         if (isp .gt. nsp .and. isp .lt. 10 ) cycle 
+! s52d: write dd to file, prepare data for time diversity
+         if (isp .eq. 10) then
+            if (divsav) then ! save data for space diversity?
+               smax=0.0 ! mark end of the list
+               nsnr=0.0
+               f1=0.0 ! it would be nice to add actual RX QRG
+               write(101) smax,nsnr,xdt,f1,message,iaptype,qual
+               write(101) dd
+               close(101) ! close fast, so other task can read after time diversity
+            endif
+               
+            call timer('timed4  ',0)
+            ipnow=mod(nutc,100) ! 0..60
+            ipnow=mod(ipnow,30)/7 +1 ! 1..4, which 15s period in the minute
+            ipold=ipnow -2
+            if (ipold .le. 0) ipold=ipold+4 !previous odd/even period
+            ddd(:,ipnow)=dd
+            dosubtract=.false. ! no need at these passes
+            divread=.true. ! will be false if read fails
+!         print *,'TD: ',ipold,ipnow,nutc
+            cycle
+         endif
+! time diversity: add what is left in dd with previous odd/even period 
+         if (isp .gt. 10 .and. isp .le. (10+tdlen) ) then
+            if (.not.tdivok) cycle 
+            dtoffset = dttablet(isp-10)
+            dd(1:NMAX-dtoffset) = ddd(1:NMAX-dtoffset,ipnow) +ddd(1+dtoffset:NMAX,ipold)
+!         print *,'TDIV: ',isp-10,ipnow,ipold
+!         dosubtract=.false.
+         endif
+               
+         if ((isp.gt. (10+tdlen)).and.(isp .lt. 20 )) cycle 
+         
+! here comes space diversity: isp 20 reads files and prepare for space diversity 
+         if (isp.eq.20) then
+            call timer('timed4  ',1)
+            call timer('spaced4 ',0)
+! read data for space diversity. 
+            divread = fdivok
+            dosubtract=.false.
+            if (fdivok) then
+               open(102,file=trim(divrdir)//datetime//'.dd4',access='stream',status='old',iostat=ioerr, err=199)
+               if (ioerr .eq. 0) then 
+                  divread = .false.
+                  do
+! frame diversity: no need to parse again, just report if not dupe             
+                     read(102,IOSTAT=ioerr,err=199) smax,nsnr,xdt,f1,message,iaptype,qual
+                     if (ioerr.ne.0) goto 199
+                     if ((smax .eq. 0.0) .and. (nsnr .eq. 0.0)) goto 197
+                     ldupe=.false.
+                     do id=1,ndecodes
+                        if (message.eq.decodes(id)) ldupe=.true.
+                     enddo
+                     if(.not.ldupe) then
+                        ndecodes=ndecodes+1
+                        decodes(ndecodes)=message
+                     endif
+                     if(.not.ldupe .and. associated(this%callback)) then
+                        iaptype=iaptype+300  ! frame diversity
+                        call this%callback(smax,nsnr,xdt,f1,message,iaptype,qual)
+                     endif
+                  enddo
+! now read residual dd from another jt9            
+197               if (sdivok) then 
+                     read(102,IOSTAT=ioerr,err=199) ddd(:,5)
+                     if (ioerr.ne.0) then
+                        divread=.false.;
+                        goto 198
+                     endif
+! s52d: scaling do not give ME advantage, IC-7610 has good AGC
+!              scale1=sum(abs(ddd(4*12000:5*12000,ipnow))) ! dd saved before time diversity
+!              scale2=sum(abs(ddd(4*12000:5*12000,5))) ! other wsjtx dd
+!              if (scale2 .lt. 1.0) scale2 = scale1 ! unlikely to be zero, if both are 0 then it is ok to fail ;-)
+!              scale2=scale1/scale2
+!              print *,scale2
+!               ddd(:,5)=ddd(:,5)*scale2 ! same amplitude, RX might be set differently
+                     divread=.true. ! proceed with space diversity
+                  endif 
+198               close(102, status='delete',err=199) ! erase file when data is read
+               endif
+199            cycle ! error: probably nothing to read.         
+            endif
+         endif !pass=20
+! passes 21 to 27 are for space diversity
+         if (isp .ge. 21 .and. isp .le. (20+sdlen) ) then
+            if (divread) then
+               dtoffset = dttables(isp-20)
+               dd(1:NMAX-dtoffset) = ddd(1:NMAX-dtoffset,ipnow) +ddd(1+dtoffset:NMAX,5)
+!          print *,'SDIV: ',isp,ipnow,ipold
+            else 
+               cycle
+            endif
+         endif !isp 20..27
+         
+         if (isp .eq. 28) call timer('spaced4 ',1) 
+         if (isp .gt. (20+sdlen)) cycle
+         
+         
+! original code
 
          candidate=0.0
          ncand=0
@@ -453,6 +622,18 @@ contains
                      nsnr=nint(max(-21.0,xsnr))
                      xdt=ibest/666.67 - 0.5
                      qual=1.0-(nharderror+dmin)/60.0 
+! diversity, s52d
+                     if (isp .gt. nsp) then !   t/f/s shall be aded to the message
+                           if (isp .lt. 20) then
+                            iaptype=iaptype+100 ! time diversity
+                           else
+                            iaptype=iaptype+200 ! space diversity
+                           endif
+                     endif
+                     if (divsav .and. (isp.lt.10)) then ! frame diversity, s52d
+                        write(101) smax,nsnr,xdt,f1,message,iaptype,qual
+                     endif                               
+! original code
                      call this%callback(smax,nsnr,xdt,f1,message,iaptype,qual)
                      exit
                   endif

@@ -247,7 +247,7 @@ contains
     implicit none
     character(len=*), optional, intent(in) :: filename
     include 'timer_common.inc'
-    data level/0/, onlevel/11 * 0/
+    data level/0/, onlevel/13 * 0/
     if (present (filename)) then
        open (newunit=lu, file=filename, status='unknown')
     else
